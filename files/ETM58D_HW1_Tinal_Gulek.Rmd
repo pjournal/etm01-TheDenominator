@@ -1,0 +1,763 @@
+
+#HOMEWORK1
+```{r}
+
+require(knitr)
+
+require(data.table)
+
+setwd("C:/Users/Beach/Documents/GitHub/etm01-TheDenominator/files")
+getwd()
+
+#TASK1-A
+
+# read matches info
+matches=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_matches.rds')
+#read odd details
+odddetails=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_odd_details.rds')
+unique(odddetails$bookmaker)
+str(matches)
+str(odddetails)
+summary(odddetails)
+odddetails
+odddetails_ou=odddetails[betType=="ou",,]
+odddetails_over=odddetails_ou[oddtype=="over"]
+unique(odddetails_over$bookmaker)
+odddetails_over
+odddetails_over_25h=odddetails_over[totalhandicap=="2.5"]
+odddetails_over_25h
+#install.packages('lubridate')
+require(lubridate)
+matches[,timestamp:=as_datetime(date,tz='Turkey')]
+matches[,date:=NULL]
+odddetails_over_25h[,timestamp:=as_datetime(date,tz='Turkey')]
+odddetails_over_25h[,date:=NULL]
+odddetails_over_25h_ordered=odddetails_over_25h[order(matchId,bookmaker,timestamp)]
+odddetails_over_25h_ordered
+closing_odds=odddetails_over_25h_ordered[,list(close_odd=odd[.N]),list(matchId,bookmaker)]
+opening_odds=odddetails_over_25h_ordered[,list(open_odd=odd[1]),list(matchId,bookmaker)]
+str(closing_odds)
+str(opening_odds)
+closing_odds
+opening_odds
+
+first_10Bet=opening_odds[bookmaker=="10Bet"]
+first_12BET=opening_odds[bookmaker=="12BET"]
+first_188BET=opening_odds[bookmaker=="188BET"]
+first_1xBet=opening_odds[bookmaker=="1xBet"]
+first_BetVictor=opening_odds[bookmaker=="BetVictor"]
+last_10Bet=closing_odds[bookmaker=="10Bet"]
+last_12BET=closing_odds[bookmaker=="12BET"]
+last_188BET=closing_odds[bookmaker=="188BET"]
+last_1xBet=closing_odds[bookmaker=="1xBet"]
+last_BetVictor=closing_odds[bookmaker=="BetVictor"]
+
+last_10Bet_prob=last_10Bet[,list(prob=1/close_odd),list(matchId)]
+last_10Bet_prob
+last_12BET_prob=last_12BET[,list(prob=1/close_odd),list(matchId)]
+last_12BET_prob
+last_188BET_prob=last_188BET[,list(prob=1/close_odd),list(matchId)]
+last_188BET_prob
+last_1xBet_prob=last_1xBet[,list(prob=1/close_odd),list(matchId)]
+last_1xBet_prob
+last_BetVictor_prob=last_BetVictor[,list(prob=1/close_odd),list(matchId)]
+last_BetVictor_prob
+first_10Bet_prob=first_10Bet[,list(prob=1/open_odd),list(matchId)]
+first_10Bet_prob
+first_12BET_prob=first_12BET[,list(prob=1/open_odd),list(matchId)]
+first_12BET_prob
+first_188BET_prob=first_188BET[,list(prob=1/open_odd),list(matchId)]
+first_188BET_prob
+first_1xBet_prob=first_1xBet[,list(prob=1/open_odd),list(matchId)]
+first_1xBet_prob
+first_BetVictor_prob=first_BetVictor[,list(prob=1/open_odd),list(matchId)]
+first_BetVictor_prob
+
+matches[,c('score_home','score_away'):=tstrsplit(score,':')]
+matches[,score_home:=as.numeric(score_home)]
+matches[,score_away:=as.numeric(score_away)]
+
+matches[,H25:=score_home+score_away]
+matches[,outcome:=ifelse(H25>2.5,"YES","NO")]
+
+
+#10Betlast
+mergedtable10Betlast=merge(last_10Bet_prob,matches[,list(matchId,outcome)],
+                        by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable10Betlast[,probbucket:=cut(prob,bucket)]
+
+
+summary_buckets10Betlast=mergedtable10Betlast[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                        ,.N),by=list(probbucket)]
+summary_buckets10Betlast[,ratio:=wins/N]
+summary_buckets10Betlast
+
+str(summary_buckets10Betlast)
+
+#'implementing numerical buckets
+Comp = c(0.475, 0.575, 0.225 , 0.675, 0.625, 0.575, 0.850)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets10Betlast,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets10Betlast=plot(Comp3$ratio,Comp3$Comp, main="10 Bet Final", 
+                                   xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#The graph above shows that most of the bins are above the x=y line which is profitable for the bookmaker but not the bidder. For us it may seem like low probablity(high odds) matches might be profitable.
+
+#10Betfirst
+mergedtable10Betfirst=merge(first_10Bet_prob,matches[,list(matchId,outcome)],
+                           by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable10Betfirst[,probbucket:=cut(prob,bucket)]
+
+summary_buckets10Betfirst=mergedtable10Betfirst[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                    ,.N),by=list(probbucket)]
+summary_buckets10Betfirst[,ratio:=wins/N]
+summary_buckets10Betfirst
+
+str(summary_buckets10Betfirst)
+
+#'implementing numerical buckets
+Comp = c(0.475, 0.225, 0.675 , 0.575, 0.625, 0.525, 0.850)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets10Betfirst,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets10Betfirst=plot(Comp3$ratio,Comp3$Comp, main="10 Bet First", 
+                                   xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#Same situation. When compared to the finals odds of the 10Bet company, it seems like they've reduced their probable loss from the low probability(high odds) matches.
+
+#12BETlast
+mergedtable12BETlast=merge(last_12BET_prob,matches[,list(matchId,outcome)],
+                       by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable12BETlast[,probbucket:=cut(prob,bucket)]
+
+summary_buckets12BETlast=mergedtable12BETlast[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                            ,.N),by=list(probbucket)]
+summary_buckets12BETlast[,ratio:=wins/N]
+summary_buckets12BETlast
+
+str(summary_buckets12BETlast)
+
+#'implementing numerical buckets
+Comp = c(0.475, 0.525, 0.225 , 0.625, 0.575)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets12BETlast,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets12Betlast=plot(Comp3$ratio,Comp3$Comp, main="12 Bet Last", 
+                                    xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#12 Bet did not place high probability low odds for the matches since these are missing in the graph. Again low probability matches seem like a good idea to bet on.
+
+#12BETfirst
+mergedtable12BETfirst=merge(first_12BET_prob,matches[,list(matchId,outcome)],
+                           by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable12BETfirst[,probbucket:=cut(prob,bucket)]
+
+summary_buckets12BETfirst=mergedtable12BETfirst[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                    ,.N),by=list(probbucket)]
+summary_buckets12BETfirst[,ratio:=wins/N]
+summary_buckets12BETfirst
+
+str(summary_buckets12BETfirst)
+
+#'implementing numerical buckets
+Comp = c(0.475, 0.225, 0.525 , 0.575, 0.625)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets12BETfirst,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets12Betfirst=plot(Comp3$ratio,Comp3$Comp, main="12 Bet First", 
+                                    xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+
+#12 Bet did not make any significant changes on odds between their initial value and the last value.
+
+#188BETlast
+mergedtable188BETlast=merge(last_188BET_prob,matches[,list(matchId,outcome)],
+                           by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable188BETlast[,probbucket:=cut(prob,bucket)]
+
+summary_buckets188BETlast=mergedtable188BETlast[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                    ,.N),by=list(probbucket)]
+summary_buckets188BETlast[,ratio:=wins/N]
+summary_buckets188BETlast
+
+str(summary_buckets188BETlast)
+
+#'implementing numerical buckets
+Comp = c(0.475, 0.525, 0.225 , 0.625, 0.575 , 0.675)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets188BETlast,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets188Betlast=plot(Comp3$ratio,Comp3$Comp, main="188 Bet Last", 
+                                    xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#188 Bet seems to be the most accurate bookmaker, at least for now. But again their true guessing percentage is not very high for the low probability games.
+
+#188BETfirst
+mergedtable188BETfirst=merge(first_188BET_prob,matches[,list(matchId,outcome)],
+                            by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable188BETfirst[,probbucket:=cut(prob,bucket)]
+
+summary_buckets188BETfirst=mergedtable188BETfirst[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                      ,.N),by=list(probbucket)]
+summary_buckets188BETfirst[,ratio:=wins/N]
+summary_buckets188BETfirst
+
+str(summary_buckets188BETfirst)
+
+#'implementing numerical buckets
+Comp = c(0.475, 0.225, 0.525 , 0.575, 0.625)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets188BETfirst,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets188BetFirst=plot(Comp3$ratio,Comp3$Comp, main="188 Bet First", 
+                                    xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+
+#Again 188 Bet is very consistent between their initial and final odds. 
+
+#1xBetlast
+mergedtable1xBetlast=merge(last_1xBet_prob,matches[,list(matchId,outcome)],
+                            by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable1xBetlast[,probbucket:=cut(prob,bucket)]
+
+summary_buckets1xBetlast=mergedtable1xBetlast[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                      ,.N),by=list(probbucket)]
+summary_buckets1xBetlast[,ratio:=wins/N]
+summary_buckets1xBetlast
+
+str(summary_buckets1xBetlast)
+
+#'implementing numerical buckets
+Comp = c(0.475, 0.225, 0.675 , 0.525, 0.625, 0.575 , 0.85)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets1xBetlast,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets1xBetlast=plot(Comp3$ratio,Comp3$Comp, main="1xBet Last", 
+                                    xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#1xBet seems like they are playing on the safe side for high probablity games and assigning low odds for these games. Again, ust like the previous bookmakers they are not very accurate for the low probability games.
+
+#1xBetfirst
+mergedtable1xBetfirst=merge(first_1xBet_prob,matches[,list(matchId,outcome)],
+                           by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtable1xBetfirst[,probbucket:=cut(prob,bucket)]
+
+summary_buckets1xBetfirst=mergedtable1xBetfirst[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                    ,.N),by=list(probbucket)]
+summary_buckets1xBetfirst[,ratio:=wins/N]
+summary_buckets1xBetfirst
+
+str(summary_buckets1xBetfirst)
+
+#'implementing numerical buckets
+
+Comp = c(0.475, 0.225, 0.675 , 0.525, 0.575, 0.850 , 0.625)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_buckets1xBetfirst,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets1xBetfirst=plot(Comp3$ratio,Comp3$Comp, main="1xBet First", 
+                                   xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#1xBet is very consistent between their initial and final odds.
+
+
+#BetVictorlast
+mergedtableBetVictorlast=merge(last_BetVictor_prob,matches[,list(matchId,outcome)],
+                           by=c('matchId'),all.x=TRUE)
+
+bucketBetVictor=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlast[,probbucket:=cut(prob,bucketBetVictor)]
+
+summary_bucketsBetVictorlast=mergedtableBetVictorlast[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                    ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlast[,ratio:=wins/N]
+summary_bucketsBetVictorlast
+
+str(summary_bucketsBetVictorlast)
+
+#'implementing numerical buckets
+
+Comp = c(0.475, 0.575, 0.225 , 0.675, 0.625, 0.525 , 0.850)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlast,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictorlast=plot(Comp3$ratio,Comp3$Comp, main="BetVictor Last", 
+                                   xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#BetVictor is placing low odds at high probability games to stay on the safe side not to lose money. Again just like any other bookmaker they have been placing higher odds than they should have to, for low probabliy games which probably caused them lose some money.
+
+#BetVictorfirst
+mergedtableBetVictorfirst=merge(first_BetVictor_prob,matches[,list(matchId,outcome)],
+                               by=c('matchId'),all.x=TRUE)
+
+bucket=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorfirst[,probbucket:=cut(prob,bucket)]
+
+summary_bucketsBetVictorfirst=mergedtableBetVictorfirst[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                            ,.N),by=list(probbucket)]
+summary_bucketsBetVictorfirst[,ratio:=wins/N]
+summary_bucketsBetVictorfirst
+
+str(summary_bucketsBetVictorfirst)
+
+#'implementing numerical buckets
+
+Comp = c(0.475, 0.225, 0.675 , 0.575, 0.525, 0.850 , 0.625)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlast,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_buckets1xBetfirst=plot(Comp3$ratio,Comp3$Comp, main="BetVictor First", 
+                                   xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#BetVictor is not very accurate when they are placing odds initially. However in they have been giving high probabilities(low odds) for the matches which are not going to end according to their expectation. They probably earned some money because of this strategy from the initial bidders.
+
+#Task1-B
+
+#BetVictorlast
+
+#2011
+mergedtableBetVictorlastB=merge(last_BetVictor_prob,matches[,list(matchId,outcome,year(timestamp))],
+                               by=c('matchId'),all.x=TRUE)
+mergedtableBetVictorlastB
+
+mergedtableBetVictorlastB2011=mergedtableBetVictorlastB[(V3=="2011")]
+mergedtableBetVictorlastB2011
+
+bucketBetVictorlastB2011=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2011[,probbucket:=cut(prob,bucketBetVictorlastB2011)]
+
+summary_bucketsBetVictorlastB2011=mergedtableBetVictorlastB2011[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                            ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2011[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2011
+
+#'implementing numerical buckets
+
+Comp = c(0.575, 0.225, 0.475 , 0.675, 0.525, 0.850 , 0.625)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2011,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2011=plot(Comp3$ratio,Comp3$Comp, main="2011 BetVictor", 
+                                   xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#BetVictor was losing money from the games which was going to end above 2.5 goals, because they have been underestimating the occurance of matches whic ended over 2.5 goals.
+
+#2012
+
+mergedtableBetVictorlastB2012=mergedtableBetVictorlastB[(V3=="2012")]
+mergedtableBetVictorlastB2012
+
+bucketBetVictorlastB2012=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2012[,probbucket:=cut(prob,bucketBetVictorlastB2012)]
+
+summary_bucketsBetVictorlastB2012=mergedtableBetVictorlastB2012[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                                      ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2012[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2012
+
+#'implementing numerical buckets
+
+Comp = c(0.625, 0.525, 0.575 , 0.475, 0.675, 0.225 , 0.850)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2012,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2012=plot(Comp3$ratio,Comp3$Comp, main="2012 BetVictor", 
+                                       xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#BetVictor corrected their biddings from last year.
+
+#2013
+mergedtableBetVictorlastB2013=mergedtableBetVictorlastB[(V3=="2013")]
+mergedtableBetVictorlastB2013
+
+bucketBetVictorlastB2013=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2013[,probbucket:=cut(prob,bucketBetVictorlastB2013)]
+
+summary_bucketsBetVictorlastB2013=mergedtableBetVictorlastB2013[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                                      ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2013[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2013
+
+#'implementing numerical buckets
+
+Comp = c(0.675, 0.575, 0.625 , 0.525, 0.475, 0.225 , 0.850)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2013,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2013=plot(Comp3$ratio,Comp3$Comp, main="2013 BetVictor", 
+                                       xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#BetVictor continued it's safe side standing in 2013 by placing low odds at the high probablity games which ended below the probabilty.
+
+#2014
+mergedtableBetVictorlastB2014=mergedtableBetVictorlastB[(V3=="2014")]
+mergedtableBetVictorlastB2014
+
+bucketBetVictorlastB2014=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2014[,probbucket:=cut(prob,bucketBetVictorlastB2014)]
+
+summary_bucketsBetVictorlastB2014=mergedtableBetVictorlastB2014[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                                      ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2014[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2014
+
+#'implementing numerical buckets
+
+Comp = c(0.625, 0.475, 0.225 , 0.850, 0.675, 0.575 , 0.525)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2014,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2014=plot(Comp3$ratio,Comp3$Comp, main="2014 BetVictor", 
+                                       xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#In 2014, BetVictor placed higher odds in 5 of 7 of the buckests which probably made them lose money.
+
+#2015
+mergedtableBetVictorlastB2015=mergedtableBetVictorlastB[(V3=="2015")]
+mergedtableBetVictorlastB2015
+
+bucketBetVictorlastB2015=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2015[,probbucket:=cut(prob,bucketBetVictorlastB2015)]
+
+summary_bucketsBetVictorlastB2015=mergedtableBetVictorlastB2015[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                                      ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2015[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2015
+
+#'implementing numerical buckets
+
+Comp = c(0.475, 0.225, 0.575 , 0.625, 0.575, 0.850 , 0.675)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2015,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2015=plot(Comp3$ratio,Comp3$Comp, main="2015 BetVictor", 
+                                       xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#A better year for BetVictor when compared to 2014.
+
+#2016
+mergedtableBetVictorlastB2016=mergedtableBetVictorlastB[(V3=="2016")]
+mergedtableBetVictorlastB2016
+
+bucketBetVictorlastB2016=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2016[,probbucket:=cut(prob,bucketBetVictorlastB2016)]
+
+summary_bucketsBetVictorlastB2016=mergedtableBetVictorlastB2016[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                                      ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2016[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2016
+
+#'implementing numerical buckets
+
+Comp = c(0.475, 0.625, 0.225 , 0.525, 0.575, 0.850 , 0.675)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2016,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2016=plot(Comp3$ratio,Comp3$Comp, main="2016 BetVictor", 
+                                       xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#In 2016, BetVcitor could not guess the games in the buckets close to 0.50 over/under ratio. They places safer odds for themselves for 0.5 occurange rate games But other than that they've been placing higher odds than they should have for most of the other buckets.
+
+#2017
+mergedtableBetVictorlastB2017=mergedtableBetVictorlastB[(V3=="2017")]
+mergedtableBetVictorlastB2017
+
+bucketBetVictorlastB2017=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2017[,probbucket:=cut(prob,bucketBetVictorlastB2017)]
+
+summary_bucketsBetVictorlastB2017=mergedtableBetVictorlastB2017[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                                      ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2017[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2017
+
+#'implementing numerical buckets
+
+Comp = c(0.475, 0.225, 0.625 , 0.555, 0.525, 0.675 , 0.850)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2017,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2017=plot(Comp3$ratio,Comp3$Comp, main="2017 BetVictor", 
+                                       xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#Seems like a more accurate year for BetVictor.
+
+#2018
+mergedtableBetVictorlastB2018=mergedtableBetVictorlastB[(V3=="2018")]
+mergedtableBetVictorlastB2018
+
+bucketBetVictorlastB2018=c(0,0.45,0.5,0.55,0.6,0.65,0.7,1)
+mergedtableBetVictorlastB2018[,probbucket:=cut(prob,bucketBetVictorlastB2012)]
+
+summary_bucketsBetVictorlastB2018=mergedtableBetVictorlastB2012[,list(wins=sum(outcome=='YES',na.rm=TRUE)
+                                                                      ,.N),by=list(probbucket)]
+summary_bucketsBetVictorlastB2018[,ratio:=wins/N]
+summary_bucketsBetVictorlastB2018
+
+#'implementing numerical buckets
+
+Comp = c(0.625, 0.525, 0.575 , 0.475, 0.675, 0.225 , 0.850)
+Comp2 = t(Comp)
+Comp3 = cbind(summary_bucketsBetVictorlastB2018,Comp)
+Comp4 = Comp3[,4:5]
+graphsummary_bucketsBetVictor2018=plot(Comp3$ratio,Comp3$Comp, main="2018 BetVictor", 
+                                       xlab="Occurance", ylab="Odds Probability", type = "p", xlim=c(0.2, 0.9), ylim=c(0.2, 0.9))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+#BetVictor could not guess guess the low probabilty games againg just like any other year.
+
+#TASK B
+############### WORKING ON MATCH RESULTS DATA ################
+require(plyr)
+#read matches data
+matches=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_matches.rds')
+# read odds data
+odds=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_odd_details.rds')
+# Removing unncessesary information
+matches_1x2 = matches[,c("leagueId","home","away","type","date"):=NULL]
+# Removing NAs
+matches_1x2 = matches_1x2[complete.cases(matches_1x2)]
+#Checking if odd score values exist.
+unique(matches_1x2$score)
+#Removing Postponed matches
+matches_1x2[!grepl("POSTP.", matches_1x2$score),]
+#Splitting score column into two
+matches_1x2[,c('score_home','score_away'):=tstrsplit(score,':')]
+#Writing the data frame as csv to reread it as data table
+write.csv(matches_1x2,'deneme.csv',row.names=F)
+matches_1x2=read.csv('deneme.csv')
+#read as data.table
+matches_1x2=fread('deneme.csv')
+matches_1x2$score_home = as.numeric(matches_1x2$score_home)
+matches_1x2$score_away = as.numeric(matches_1x2$score_away)
+#Changing name of the Score column to Result
+#matches_1x2.Columns['score'].ColumnName = "Result";
+colnames(matches_1x2) <- c("matchId", "result", "score_home", "score_away")
+#Filling the result column with 0s changing modifying it for wins and losses
+matches_1x2=matches_1x2[,result:=0]
+matches_1x2$result = as.numeric(matches_1x2$result)
+matches_1x2=matches_1x2[score_home>score_away,result:=1]
+matches_1x2=matches_1x2[score_home<score_away,result:=2]
+matches_1x2=matches_1x2[,c("score_home","score_away"):=NULL]
+str(matches_1x2)
+# Removing NAs
+matches_1x2 = matches_1x2[complete.cases(matches_1x2)]
+#Checking if odd score values exist.
+unique(matches_1x2$result)
+# WORKING ON ODDS DATA
+odds=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_odd_details.rds')
+#Filtering betType fox 1x2
+odds_1x2=odds[betType=='1x2']
+str(odds_1x2)
+#Removing betType(filtered) & totalhandicap(irrelevant for 1x2 betType)
+odds_1x2[,betType:=NULL]
+odds_1x2[,totalhandicap:=NULL]
+#Ordering mathces
+odds_1x2=odds_1x2[order(matchId, oddtype, bookmaker, date)]
+#Removing all NA's from data
+odds_1x2=odds_1x2[complete.cases(odds_1x2)]
+BetVictor_1x2=odds_1x2[bookmaker=='BetVictor']
+BetVictor_1x2=BetVictor_1x2[,bookmaker:=NULL]
+#checking how many times odds are changed for each match
+#note that we expect this number to be 6 since there are initial and final odds for the game result home win, away win and draw
+BetVictor_1x2_ini=BetVictor_1x2[,list(initial=odd[1]),by=list(matchId,oddtype)]
+BetVictor_1x2_fnl=BetVictor_1x2[,list(final=odd[.N]),by=list(matchId,oddtype)]
+BetVictor_1x2_M = merge(BetVictor_1x2_ini,BetVictor_1x2_fnl,by=c("matchId","oddtype"))
+BetVictor_1x2_wide=dcast(BetVictor_1x2_M,matchId~oddtype,value.var=c('initial','final'))
+BetVictor_1x2_U=unique(merge(matches_1x2,BetVictor_1x2_wide,by='matchId'))
+BetVictor_1x2_U
+BetVictor_1x2_P=BetVictor_1x2_U[,First_Draw_P:=1/initial_oddX]
+BetVictor_1x2_P=BetVictor_1x2_P[,First_Home_P:=1/initial_odd1]
+BetVictor_1x2_P=BetVictor_1x2_P[,First_Away_P:=1/initial_odd2]
+BetVictor_1x2_P=BetVictor_1x2_P[,First_P_Total:=First_Draw_P+First_Home_P+First_Away_P]
+#Normalizing All Probabilities
+BetVictor_1x2_P=BetVictor_1x2_P[,First_Draw_P:=First_Draw_P/First_P_Total]
+BetVictor_1x2_P=BetVictor_1x2_P[,First_Home_P:=First_Home_P/First_P_Total]
+BetVictor_1x2_P=BetVictor_1x2_P[,First_Away_P:=First_Away_P/First_P_Total]
+#BetVictor_1x2=BetVictor_1x2[,intotalProb:=NULL]
+BetVictor_1x2_P=BetVictor_1x2_P[,Last_Draw_P:=1/final_oddX]
+BetVictor_1x2_P=BetVictor_1x2_P[,Last_Home_P:=1/final_odd1]
+BetVictor_1x2_P=BetVictor_1x2_P[,Last_Away_P:=1/final_odd2]
+BetVictor_1x2_P=BetVictor_1x2_P[,Last_P_Total:=Last_Draw_P+Last_Home_P+Last_Away_P]
+#Normalizing All Probabilities
+BetVictor_1x2_P=BetVictor_1x2_P[,Last_Draw_P:=Last_Draw_P/Last_P_Total]
+BetVictor_1x2_P=BetVictor_1x2_P[,Last_Home_P:=Last_Home_P/Last_P_Total]
+BetVictor_1x2_P=BetVictor_1x2_P[,Last_Away_P:=Last_Away_P/Last_P_Total]
+#BetVictor_1x2=BetVictor_1x2[,fintotalProb:=NULL]
+BetVictor_1x2_P=BetVictor_1x2_P[,P_Delta:=Last_Home_P-Last_Away_P]
+BetVictor_1x2_O=BetVictor_1x2_P[order(P_Delta)]
+BetVictor_1x2_O
+BetVictor_1x2_O$ID <- seq.int(nrow(BetVictor_1x2_O))
+BetVictor_1x2_G = BetVictor_1x2_O [,group:=ceiling(ID/30)]
+BetVictor_1x2_G
+
+plot(BetVictor_1x2_G$P_Delta,BetVictor_1x2_G$Last_Draw_P, type = "p", xlim=c(-1, 1), ylim=c(0, 1))
+
+summary_buckets1 = BetVictor_1x2_G[,list(away=sum(result=='2',na.rm=TRUE)
+                                         ,.N),by=list(group)]
+summary_buckets2 = BetVictor_1x2_G[,list(home=sum(result=='1',na.rm=TRUE)
+                                         ,.N),by=list(group)]
+summary_buckets3 = BetVictor_1x2_G[,list(draw=sum(result=='0',na.rm=TRUE)
+                                         ,.N),by=list(group)]
+summary_buckets1[,ratioaway:=away/N]
+summary_buckets2[,ratiohome:=home/N]
+summary_buckets3[,ratiodraw:=draw/N]
+summary_buckets1
+colnames(summary_buckets1)[colnames(summary_buckets1)=="ratio"] <- "ratioaway"
+
+colnames(summary_buckets2)[colnames(summary_buckets1)=="ratio"] <- "ratiohome"
+
+colnames(summary_buckets3)[colnames(summary_buckets1)=="ratio"] <- "ratiodraw"
+sum111=merge(summary_buckets1,summary_buckets2[,list(group)],
+             by=c('group'),all.x=TRUE)
+sum111 = cbind(summary_buckets1$ratioaway, summary_buckets2$ratiohome, summary_buckets3$ratiodraw)
+sum222 = sum111[,2]-sum111[,1]
+sum333 = cbind(sum111, sum222)
+
+points(sum333[,4],sum333[,3], cex=1.0,col='red')
+abline(v=c(-0.2,0.2))
+
+#Black dots represent mathces probabilities driven form the odds that have been placed. Red circles represent bins each carrying 30 games' results distribution. We can drive the conclusion of placing bets on draws might be advantageous when home team winning probability is very close to away team winning probability.
+
+```
