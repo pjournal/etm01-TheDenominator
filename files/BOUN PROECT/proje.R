@@ -1,0 +1,5 @@
+getwd()
+setwd( "C:/Users/Beach/Documents/GitHub/etm01-TheDenominator/files/BOUN PROECT")
+df <- read.table("df_v3.csv", header=FALSE)
+df = setNames(df,c('lever_position', 'ship_speed', 'gt_shaft', 'gt_rate', 'gg_rate', 'sp_torque', 'pp_torque', 'hpt_temp', 'gt_c_i_temp', 'gt_c_o_temp', 'hpt_pressure', 'gt_c_i_pressure', 'gt_c_o_pressure', 'gt_exhaust_pressure', 'turbine_inj_control', 'fuel_flow', 'gt_c_decay',  'gt_t_decay'))
+str(df)

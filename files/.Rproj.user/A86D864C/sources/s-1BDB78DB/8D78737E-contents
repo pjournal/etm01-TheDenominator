@@ -1,0 +1,142 @@
+#install.packages('data.table')
+install.packages('data.table')
+require(data.table)
+setwd("C:/Users/Beach/Documents/GitHub/etm01-TheDenominator/files")
+# read matches info
+matches=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_matches.rds')
+# read odds data
+odds=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_odd_details.rds')
+# check unique home team
+odds_over = odds[betType=="ou",,]
+odds_over2 = odds_over[oddtype == "over",,]
+odds_over25 = odds_over25[totalhandicap == "2.5",,]
+unique(odds_over25$bookmaker)
+summary(odds_over25)
+str(odds_over25)
+#install.packages('lubridate')
+require(lubridate)
+matches[,timestamp:=as_datetime(date,tz='Turkey')]
+matches[,date:=NULL]
+odds_over25[,timestamp:=as_datetime(date,tz='Turkey')]
+odds_over25[,date:=NULL]
+# order by score_home ascending and then score_away ascending
+odds_over25_order=odds_over25[order(matchId,bookmaker,timestamp)]
+odds_over25_order_latest=odds_over25_order[,list(close_odd=odd[.N]),list(matchId,oddtype,bookmaker)]
+odds_over25_order_first = odds_over25_order[,list(open_odd=odd[1]),list(matchId,oddtype,bookmaker)]
+odds_over25_order_first
+odds_over25_order_latest
+First_10Bet = odds_over25_order_first[bookmaker=="10Bet"]
+First_188BET = odds_over25_order_first[bookmaker=="188BET"]
+First_1xBet = odds_over25_order_first[bookmaker=="1xBet"]
+First_bwin = odds_over25_order_first[bookmaker=="bwin"]
+First_youwin = odds_over25_order_first[bookmaker=="youwin"]
+Last_10Bet = odds_over25_order_latest[bookmaker=="10Bet"]
+Last_188BET = odds_over25_order_latest[bookmaker=="188BET"]
+Last_1xBet = odds_over25_order_latest[bookmaker=="1xBet"]
+Last_bwin = odds_over25_order_latest[bookmaker=="bwin"]
+Last_youwin = odds_over25_order_latest[bookmaker=="youwin"]
+Last_youwin
+Last_youwin_wp = Last_youwin[,list(prob=1/close_odd),list(matchId)]
+Last_youwin_wp
+
+bucket=c(0:20)/20
+Last_youwin_wp_bin = Last_youwin_wp[,bin:=cut(prob,bucket)]
+Last_youwin_wp_bin_4550 = Last_youwin_wp_bin[bin=="(0.45,0.5]"]
+Last_youwin_wp_bin_4550
+
+summary_buckets=Last_youwin_wp[,list(over5=sum(result=='home',na.rm=TRUE)
+                                        ,.N),by=list(bin)]
+summary_buckets[,ratio:=homewins/N]
+
+str(matches)
+
+# manipulate score to break home score from away score
+matches[,c('score_home','score_away'):=tstrsplit(score,':')]
+write.csv(matches,'deneme.csv',row.names=F)
+matches=read.csv('deneme.csv')
+#read as data.table
+matches=fread('deneme.csv')
+matches = matches[complete.cases(matches)]
+matches$score_home = as.numeric(matches$score_home)
+matches$score_away = as.numeric(matches$score_away)
+matches_total = matches[,list(total_score=score_home+score_away),list(matchId)]
+
+cols = matches_total$total_score
+
+matches_total_TRUE = cols>2.5
+matches_total_TRUE = data.table(matches_total_TRUE)
+matches_total_TRUE
+matches_total
+str(matches_total)
+AAA = cbind(matches_total, matches_total_TRUE)
+##for (i in cols) matches_total[[i]] <- matches_total[,list()]
+AAA
+str(AAA)
+str(Last_youwin_wp)
+##wide_odds=dcast(latest_odds,matchId~oddtype,value.var='close_odd')
+##odds_over25[names(odds_over25)=="1xBet"]
+# merge / join result and odds
+odds_with_results=merge(Last_youwin_wp,AAA[,list(matchmatches_total_TRUE)],
+                        by=c("matchId") ,all.x = TRUE)
+AAA$matchId
+Last_youwin_wp$matchId
+bucket=c(0:20)/20
+odds_with_results[,discrete_home:=cut(home_prob,bucket)]
+summary_buckets=odds_with_results[,list(homewins=sum(result=='home',na.rm=TRUE)
+                                        ,.N),by=list(discrete_home)]
+summary_buckets[,ratio:=homewins/N]
+
+
+
+# filtering '0:0'
+matches[score=='0:0']
+# filtering '0:0' and home team tottenham
+matches[score=='0:0' & home=='tottenham']
+# tenth entry
+matches[10]
+# delete column type
+matches[,type:=NULL]
+# delete leagueId
+matches$leagueId=NULL
+
+# fix data error
+matches[home=='manchester-utd',home:='manchester united']
+matches[home=='manchester-united',home:='manchester united']
+# check corrections
+sort(unique(matches$home))
+# fix away error
+matches[away %in% c('manchester-utd','manchester-united') ,away:='manchester united']
+
+
+#install.packages('readxl')
+require(readxl)
+excel_matches=data.table(read_excel('deneme.xlsx',1))
+a=fread('https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.data')
+matches[,c('score_home','score_away'):=as.numeric(tstrsplit(score,':'))]
+matches[,score_home:=as.numeric(score_home)]
+matches[,score_away:=as.numeric(score_away)]
+# remove score column
+matches[,score:=NULL]
+# adding result column
+matches[,result:=ifelse(score_home>score_away,'home',
+                        ifelse(score_home==score_away,'draw','away'))]
+
+
+
+# average away goals by year
+avg_goals=matches[,list(avg=mean(score_away,na.rm=T)),by=list(year(timestamp))]
+# average away goals and match count by year
+avg_goals=matches[,list(avg=mean(score_away,na.rm=T),count=.N),by=list(year(timestamp))]
+# average away goals and match count by hour
+avg_goals=matches[,list(avg=mean(score_away,na.rm=T),count=.N),by=list(hour(timestamp))]
+
+# filter 1x2 type odd, bookmaker pinnacle
+filtered_odd=odds[betType=='1x2' & bookmaker=='Pinnacle']
+filtered_odd[,totalhandicap:=NULL]
+filtered_odd[,timestamp:=as_datetime(date,tz='Turkey')]
+filtered_odd=filtered_odd[order(matchId,oddtype,timestamp)]
+
+wide_odds[,home_prob:=1/odd1]
+wide_odds[,draw_prob:=1/oddX]
+wide_odds[,away_prob:=1/odd2]
+# normalize prob - to do

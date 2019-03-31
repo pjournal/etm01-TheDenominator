@@ -1,5 +1,7 @@
 # Progress Journal Example Title
 
+## Week 4 (O)
+
 ## Week 3 (Oct 24)
 
 + The data set I am propose to use in my project is the Titanic Survival data set. [Here](https://www.kaggle.com/mrisdal/exploring-survival-on-the-titanic) is the data and my initial exploratory data analysis on it.
@@ -8,6 +10,6 @@
 ### Udacity Update 
 I finished Lesson X on the Udacity course. I did all the work required and all the quizes. 
 
-## Week 2 (Oct 10)
+## Week 2 (Feb 10)
 
 + [Here](files/interesting_examples.html) is my 5 interesting R examples.

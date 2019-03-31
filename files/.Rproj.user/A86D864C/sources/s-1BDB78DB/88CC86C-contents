@@ -1,0 +1,135 @@
+#install.packages('data.table')
+install.packages('data.table')
+require(data.table)
+setwd("C:/Users/Beach/Documents/GitHub/etm01-TheDenominator/files")
+# read matches info
+matches=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_matches.rds')
+# read odds data
+odds=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_odd_details.rds')
+# check unique home team
+odds_over = odds[betType=="ou",,]
+odds_over2 = odds_over[oddtype == "over",,]
+odds_over25 = odds_over2[totalhandicap == "2.5",,]
+unique(odds_over25$bookmaker)
+summary(odds_over25)
+str(odds_over25)
+#install.packages('lubridate')
+require(lubridate)
+library(lubridate)
+matches[,timestamp:=as_datetime(date,tz='Turkey')]
+matches[,date:=NULL]
+odds_over25[,timestamp:=as_datetime(date,tz='Turkey')]
+odds_over25[,date:=NULL]
+# order by score_home ascending and then score_away ascending
+odds_over25_order=odds_over25[order(matchId,bookmaker,timestamp)]
+odds_over25_order_latest=odds_over25_order[,list(close_odd=odd[.N]),list(matchId,oddtype,bookmaker)]
+odds_over25_order_first = odds_over25_order[,list(open_odd=odd[1]),list(matchId,oddtype,bookmaker)]
+odds_over25_order_first
+odds_over25_order_latest
+First_5bm = odds_over25_order_first[bookmaker=="10Bet" | bookmaker=="188BET" | bookmaker=="1xBet"|  bookmaker=="bwin" | bookmaker=="youwin"]
+Latest_5bm = odds_over25_order_latest[bookmaker=="10Bet" | bookmaker=="188BET" | bookmaker=="1xBet"|  bookmaker=="bwin" | bookmaker=="youwin"]
+First_5bm = First_5bm[,-2]
+Latest_5bm = Latest_5bm[,-2]
+
+# First_10Bet = odds_over25_order_first[bookmaker=="10Bet"]
+# First_188BET = odds_over25_order_first[bookmaker=="188BET"]
+# First_1xBet = odds_over25_order_first[bookmaker=="1xBet"]
+# First_bwin = odds_over25_order_first[bookmaker=="bwin"]
+# First_youwin = odds_over25_order_first[bookmaker=="youwin"]
+# Last_10Bet = odds_over25_order_latest[bookmaker=="10Bet"]
+# Last_188BET = odds_over25_order_latest[bookmaker=="188BET"]
+# Last_1xBet = odds_over25_order_latest[bookmaker=="1xBet"]
+# Last_bwin = odds_over25_order_latest[bookmaker=="bwin"]
+# Last_youwin = odds_over25_order_latest[bookmaker=="youwin"]
+
+
+wide_odds=dcast(First_5bm,matchId~bookmaker,value.var='open_odd')
+wide_odds
+
+#Manipulating match result data
+matches=readRDS('df9b1196-e3cf-4cc7-9159-f236fe738215_matches.rds')
+matches[,timestamp:=as_datetime(date,tz='Turkey')]
+matches[,date:=NULL]
+matches[,c('score_home','score_away'):=tstrsplit(score,':')]
+write.csv(matches,'deneme.csv',row.names=F)
+matches=read.csv('deneme.csv')
+#read as data.table
+matches=fread('deneme.csv')
+matches = matches[complete.cases(matches)]
+matches$score_home = as.numeric(matches$score_home)
+matches$score_away = as.numeric(matches$score_away)
+matches_total = matches[,list(total_score=score_home+score_away),list(matchId)]
+
+cols = matches_total$total_score
+
+matches_total_TRUE = cols>2.5
+matches_total_TRUE = data.table(matches_total_TRUE)
+matches_total_TRUE
+matches_total
+str(matches_total)
+AAA = cbind(matches_total, matches_total_TRUE)
+AAA
+
+odds_with_results=merge(wide_odds,AAA[,list(matchId,matches_total_TRUE)],
+                        
+                        by=c('matchId'),all.x=TRUE)
+
+colnames(odds_with_results)[colnames(odds_with_results)=="10Bet"] <- "TenBet"
+colnames(odds_with_results)[colnames(odds_with_results)=="1xBet"] <- "OnexBet"
+colnames(odds_with_results)[colnames(odds_with_results)=="188BET"] <- "H88BET"
+odds_with_results
+#Column isimlerini
+odds_with_results_probs = odds_with_results[,pbwin:=1/bwin]
+odds_with_results_probs = odds_with_results[,pTenBet:=1/TenBet]
+odds_with_results_probs = odds_with_results[,pOnexBet:=1/OnexBet]
+odds_with_results_probs = odds_with_results[,pH88BET:=1/H88BET]
+odds_with_results_probs = odds_with_results[,pyouwin:=1/youwin]
+odds_with_results_probs
+
+bucket=c(0:20)/20
+gap = c(0, 0.4, 0.45, 0.50, 0.55, 0.6, 0.65, 0.7, 1)
+#odds_with_results_probs[,discrete_home:=cut(pbwin,gap,year(timestamp))]
+odds_with_results_probs_2 = odds_with_results_probs[,cutbwin:=cut(pbwin,gap)]
+odds_with_results_probs_2 = odds_with_results_probs_2[,cutTenBet:=cut(pTenBet,gap)]
+odds_with_results_probs_2 = odds_with_results_probs_2[,cutOnexBet:=cut(pOnexBet,gap)]
+odds_with_results_probs_2 = odds_with_results_probs_2[,cutH88BET:=cut(pH88BET,gap)]
+odds_with_results_probs_2 = odds_with_results_probs_2[,cutyouwin:=cut(pyouwin,gap)]
+odds_with_results_probs_2
+
+#summary_buckets=odds_with_results_probs_bwin[,list(homewins=sum(matches_total_TRUE=='TRUE',na.rm=TRUE)
+#                                        ,.N),by=list(discrete_home)]
+summary_buckets = odds_with_results_probs_2[,list(over25=sum(matches_total_TRUE=='TRUE',na.rm=TRUE)
+                                                   ,.N),by=list(discrete_home)]
+
+summary_buckets[,ratio:=homewins/N]
+summary(summary_buckets)
+summary_buckets
+str(summary_buckets)
+summary_buckets$discrete_home = strsplit(summary_buckets$discrete_home, ",")
+#replace(summary_buckets, summary_buckets=="(0.45,0.5]", 0.475)
+summary_buckets$discrete_home[summary_buckets$discrete_home == "(0,0.05]"] <- 0.05
+Comp = c(0.475, 0.525, 0.425 , 0.675, 0.575, 0.625, 0.725, 0.375, 0.775, 0, 0.825)
+Comp
+Comp2 = t(Comp)
+Comp2
+Comp3 = cbind(summary_buckets,Comp)
+Comp3
+Comp4 = Comp3[,4:5]
+Comp4
+plot(Comp3$ratio,Comp3$Comp, type = "p", xlim=c(0.3, 0.75), ylim=c(0.3, 0.75))
+x=rnorm(10,0,1)
+y=rnorm(10,0,1)
+my_line <- function(x,y,...){
+  points(x,y,...)
+  segments(min(x), min(y), max(x), max(y),...)
+}
+abline(a=0, b=1)
+
+##BBBB
+odds_with_results_B=merge(wide_odds,matches[,list(matchId,matches_total_TRUE, year(timestamp))],
+                        by=c('matchId'),all.x=TRUE)
+odds_with_results_B2015 = odds_with_results_B[(V3="2015")]
+##Buckertların belirle
+##cut'lıfonktiyonu kullan
+##listli uzun fonksyionu kullan
+##summary ratio wins
