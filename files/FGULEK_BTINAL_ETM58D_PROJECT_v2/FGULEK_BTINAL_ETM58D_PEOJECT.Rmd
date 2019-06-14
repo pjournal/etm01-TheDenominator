@@ -1,0 +1,125 @@
+
+#FATIH GULEK & BATUHAN TINAL ETM58D PROJECT
+
+1. INTRODUCTION
+
+We have a dataset which includes numerous matches and odds data beginning from 2010 to 2019. The aim of our project is to provide better forecasts for 1X2 bets by using odds data. To measure our success rate, we are going to use the predicted probabilities coming out of our model in comparison with actual game results.
+
+2. LITERATURE
+
+Since the outcomes of matches are in a natural and clear order we chose to use "Ordinal Regression" model which has been used by Alves & Soares de Mello (2011) for Brazillian Football Championship, by Lawall & Sundheim (2007) in modeling the 2002-2003 English Professional League (EPL). The model of Lawall & Sundheim (2007) was effective in anticipating EPL results. That model uses only the advantage of playing at home and the individual strengths of each team as explanatory variables.
+
+3. APPROACH
+
+We preferred to select our training data as the previous seasons data only, excluding matches between 2010-2011 & 2016-2017 seasons. We thought that taking into consideration older matches does not make much sense because football teams may change rapidly and mostly the team is not remaining the same for 2 years in a row.
+
+4. RESULTS
+
+Our ordinal regression model has a score of 23,39 in Ranked Probability Score.
+Overall this model is very accurate at predicting home wins with an accuracy of 92,27% but we cannot say it is very succesful because it almost forecasts 4 out of every 5 games ends as a home win therefore a high true guessing rate at home wins does not reflect a significant achievement. This model is not accurate at predicting away wins(%38) and does not make any predictions of draw which is the most important drawback and has to be improved.
+
+5. CONCLUSIONS & FUTURE WORKS
+
+If we consider that predicting match results is something very difficult,  a model which has 54% accuracy can be counted as somewhat successful. Some other models like random forests and gbm can be used for forecasting as well. In addition to our work, adding different features such winning streak, losing streak to the model can be thought in the future works. Odds data which has been used as an input to our model most probably reflects the hidden information of the game like if a star/key player(s) on a team is missing this game out due to an injury or a red card, or perhaps match is played without fans in the stadium due to a penalty to the home club. Also there might be some other aspects of the game which are not introduced in the odds like a "coincidence" of a team cannot win if a certain referee is conducting the match. Moreover treating the goal difference as an ordinal outcome is a possiblity since losing 2-3 has a huge difference between losing 0-6 and this can measured as performance indicator. There are some other approaches like calculating ELO ratings or Club Index Ratings which kind of reflects current state of performance of the teams and these can be used as well. But in general, using other teams data as an input to a model which is going to predict the result of a single game between two teams does not seem very sophisticated. Different team's performance can be under affect of different variables so building a single model means neglecting important variables and/or importing noise to data. So the ultimate approach would be building different models for every single game and introducing winning/losing streaks, a rating measure of the team, referee and other factors which have been mentioned above. Since this model has not many instances like our apporach in this project, previous years data (2010-2016) between those teams can be used but perhaps with increasing weights over time since current data is going to be more relevant. And a loop has to be introduced because one cannot simply find important factors effecting each team on 380 games.
+
+6. CODE
+
+```{r}
+
+require(knitr)
+require(data.table)
+require(caTools)
+require(caret)
+require(ISLR)
+require(MASS)
+
+setwd("C:/Users/Beach/Documents/GitHub/etm01-TheDenominator/files")
+
+testStart=as.Date('2018-07-16')
+trainStart=as.Date('2017-07-15')
+rem_miss_threshold=0.01 #parameter for removing bookmaker odds with missing ratio greater than this threshold
+
+source('data_preprocessing_v2.r')
+source('feature_extraction_v2.r')
+source('performance_metrics.r')
+source('train_models_v2.r')
+
+matches_data_path='C:/Users/Beach/Documents/GitHub/etm01-TheDenominator/files/df9b1196-e3cf-4cc7-9159-f236fe738215_matches.rds'
+odd_details_data_path='C:/Users/Beach/Documents/GitHub/etm01-TheDenominator/files/df9b1196-e3cf-4cc7-9159-f236fe738215_odd_details.rds'
+
+# read data
+matches_raw=readRDS(matches_data_path)
+odd_details_raw=readRDS(odd_details_data_path)
+
+# preprocess matches
+matches=matches_data_preprocessing(matches_raw)
+
+# preprocess odd data
+odd_details=details_data_preprocessing(odd_details_raw,matches)
+
+# extract open and close odd type features from multiple bookmakers
+features=extract_features.openclose(matches,odd_details,pMissThreshold=rem_miss_threshold,trainStart,testStart)
+
+# divide data based on the provided dates
+features=features[complete.cases(features)]
+features$outcome=as.factor(features$outcome)
+features$result=rowSums(cbind(features$odd1_Betclic,features$odd2_Betclic,features$oddX_Betclic))
+features$odd1_prob=features$odd1/features$result
+features$odd2_prob=features$odd2/features$result
+features$oddX_prob=features$oddX/features$result
+split=sample.split(features$outcome,SplitRatio=0.7)
+train_features=subset(features,split==TRUE)
+test_features=subset(features,split==FALSE)
+
+train_features = train_features[,odd1_prob:=ifelse(odd1_prob<0.2,"v.low",
+                                           ifelse(odd1_prob<0.4,"low",
+                                                  ifelse(odd1_prob<0.6,"medium",
+                                                         ifelse(odd1_prob<0.8,"high","v.high"))))]
+train_features = train_features[,odd2_prob:=ifelse(odd2_prob<0.2,"v.low",
+                                           ifelse(odd2_prob<0.4,"low",
+                                                  ifelse(odd2_prob<0.6,"medium",
+                                                         ifelse(odd2_prob<0.8,"high","v.high"))))]
+train_features = train_features[,oddX_prob:=ifelse(oddX_prob<0.2,"v.low",
+                                           ifelse(oddX_prob<0.4,"low",
+                                                  ifelse(oddX_prob<0.6,"medium",
+                                                         ifelse(oddX_prob<0.8,"high","v.high"))))]
+
+test_features = test_features[,odd1_prob:=ifelse(odd1_prob<0.2,"v.low",
+                                               ifelse(odd1_prob<0.4,"low",
+                                                      ifelse(odd1_prob<0.6,"medium",
+                                                             ifelse(odd1_prob<0.8,"high","v.high"))))]
+test_features = test_features[,odd2_prob:=ifelse(odd2_prob<0.2,"v.low",
+                                               ifelse(odd2_prob<0.4,"low",
+                                                      ifelse(odd2_prob<0.6,"medium",
+                                                             ifelse(odd2_prob<0.8,"high","v.high"))))]
+test_features = test_features[,oddX_prob:=ifelse(oddX_prob<0.2,"v.low",
+                                               ifelse(oddX_prob<0.4,"low",
+                                                      ifelse(oddX_prob<0.6,"medium",
+                                                             ifelse(oddX_prob<0.8,"high","v.high"))))]
+
+polrMod <- polr(outcome ~ odd1_prob + odd2_prob + oddX_prob, data=train_features)
+
+summary(polrMod)
+
+pred_OLR=predict(polrMod,test_features)
+table(test_features$outcome,pred_OLR)
+
+pred_OLR_probs=predict(polrMod,test_features,type="prob")
+
+outcomes=matrix(0,nrow=nrow(pred_OLR_probs),ncol=3)
+
+for(e in 1:nrow(pred_OLR_probs)){
+  if(test_features$outcome[e]=='away_win'){
+    outcomes[e,1]=1
+  }else if(test_features$outcome[e]=='home_win'){
+    outcomes[e,2]=1
+  }else{
+    outcomes[e,3]=1
+  }
+}
+
+rps_OLR=RPS_matrix(pred_OLR_probs,outcomes)
+
+100*mean(rps_OLR)
+
+```
